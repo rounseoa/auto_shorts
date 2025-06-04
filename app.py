@@ -12,6 +12,14 @@ import edge_tts
 app = Flask(__name__)
 CORS(app)
 
+FONT_PATH = "fonts/나눔손글씨 사랑해 아들.ttf"
+
+def get_font(size, bold):
+    try:
+        return ImageFont.truetype(FONT_PATH, size)
+    except:
+        return ImageFont.load_default()
+
 async def generate_edge_tts(text, voice, path):
     communicate = edge_tts.Communicate(text=text, voice=voice)
     await communicate.save(path)
@@ -77,12 +85,6 @@ def generate_video():
         segment_duration = audio.duration / len(texts)
         fps = 24
         frames = []
-
-        def get_font(size, bold):
-            try:
-                return ImageFont.truetype("malgunbd.ttf" if bold else "malgun.ttf", size)
-            except:
-                return ImageFont.load_default()
 
         for i in range(len(texts)):
             img = Image.open(images[i]).convert("RGB")
