@@ -1,0 +1,6 @@
+flask
+flask-cors
+moviepy
+gtts
+Pillow
+numpy
