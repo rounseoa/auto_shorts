@@ -6,9 +6,15 @@ from gtts import gTTS
 from PIL import Image, ImageDraw, ImageFont
 import numpy as np
 import os, tempfile
+import asyncio
+import edge_tts
 
 app = Flask(__name__)
 CORS(app)
+
+async def generate_edge_tts(text, voice, path):
+    communicate = edge_tts.Communicate(text=text, voice=voice)
+    await communicate.save(path)
 
 @app.route("/preview-voice", methods=["POST"])
 def preview_voice():
@@ -18,12 +24,15 @@ def preview_voice():
     temp_dir = tempfile.mkdtemp()
     tts_path = os.path.join(temp_dir, "sample.mp3")
 
-    if voice_engine == "gtts" or voice_engine == "google":
-        gTTS(text=text, lang='ko').save(tts_path)
-    elif voice_engine == "edge":
-        os.system(f'edge-tts --voice "{edge_voice}" --text "{text}" --write-media "{tts_path}"')
-    else:
-        return jsonify({"error": "지원하지 않는 TTS 엔진"}), 400
+    try:
+        if voice_engine in ["gtts", "google"]:
+            gTTS(text=text, lang='ko').save(tts_path)
+        elif voice_engine == "edge":
+            asyncio.run(generate_edge_tts(text, edge_voice, tts_path))
+        else:
+            return jsonify({"error": "지원하지 않는 TTS 엔진"}), 400
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
     return send_file(tts_path, mimetype="audio/mpeg")
 
@@ -36,14 +45,12 @@ def generate_video():
         fontColors = request.form.getlist("fontColors")
         fontSizes = request.form.getlist("fontSizes")
         bolds = request.form.getlist("bolds")
-
         titles = request.form.getlist("titles")
         titlePositions = request.form.getlist("titlePositions")
         titleColors = request.form.getlist("titleColors")
         titleBgColors = request.form.getlist("titleBgColors")
         titleSizes = request.form.getlist("titleSizes")
         titleBolds = request.form.getlist("titleBolds")
-
         images = request.files.getlist("images")
         voice_engine = request.form.get("voiceEngine", "gtts")
         edge_voice = request.form.get("edgeVoice", "ko-KR-SunHiNeural")
@@ -56,12 +63,15 @@ def generate_video():
         output_path = os.path.join(temp_dir, "result.mp4")
 
         combined_text = ". ".join(texts)
-        if voice_engine == "gtts" or voice_engine == "google":
-            gTTS(text=combined_text, lang='ko').save(audio_path)
-        elif voice_engine == "edge":
-            os.system(f'edge-tts --voice "{edge_voice}" --text "{combined_text}" --write-media "{audio_path}"')
-        else:
-            return jsonify({"error": "지원하지 않는 TTS 엔진"}), 400
+        try:
+            if voice_engine in ["gtts", "google"]:
+                gTTS(text=combined_text, lang='ko').save(audio_path)
+            elif voice_engine == "edge":
+                asyncio.run(generate_edge_tts(combined_text, edge_voice, audio_path))
+            else:
+                return jsonify({"error": "지원하지 않는 TTS 엔진"}), 400
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
 
         audio = AudioFileClip(audio_path)
         segment_duration = audio.duration / len(texts)
@@ -83,7 +93,6 @@ def generate_video():
             bg.paste(img, (x, y))
             draw = ImageDraw.Draw(bg)
 
-            # 자막
             line = texts[i]
             font = get_font(int(fontSizes[i]), bolds[i] == 'true')
             bbox = draw.textbbox((0, 0), line, font=font)
@@ -93,7 +102,6 @@ def generate_video():
                 draw.rectangle([(text_x - 10, text_y - 10), (text_x + bbox[2] - bbox[0] + 10, text_y + bbox[3] - bbox[1] + 10)], fill=bgColors[i])
             draw.text((text_x, text_y), line, fill=fontColors[i], font=font)
 
-            # 상단 제목
             title = titles[i]
             if title:
                 title_font = get_font(int(titleSizes[i]), titleBolds[i] == 'true')
