@@ -1,7 +1,7 @@
 from flask import Flask, request, send_file, jsonify
 from flask_cors import CORS
 from moviepy.video.io.ImageSequenceClip import ImageSequenceClip
-from moviepy.editor import AudioFileClip
+from moviepy.audio.io.AudioFileClip import AudioFileClip
 from gtts import gTTS
 from PIL import Image, ImageDraw, ImageFont
 import numpy as np
