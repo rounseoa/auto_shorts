@@ -4,3 +4,4 @@ moviepy
 gtts
 Pillow
 numpy
+edge-tts
