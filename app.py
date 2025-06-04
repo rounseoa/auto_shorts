@@ -16,7 +16,7 @@ FONT_PATH = "fonts/나눔손글씨 사랑해 아들.ttf"
 
 def get_font(size, bold):
     try:
-        return ImageFont.truetype(FONT_PATH, size)
+        return ImageFont.truetype(FONT_PATH, size + 10)  # 얇은 글씨 대비 가시성 보정
     except:
         return ImageFont.load_default()
 
@@ -95,23 +95,39 @@ def generate_video():
             bg.paste(img, (x, y))
             draw = ImageDraw.Draw(bg)
 
+            # 자막
             line = texts[i]
             font = get_font(int(fontSizes[i]), bolds[i] == 'true')
             bbox = draw.textbbox((0, 0), line, font=font)
-            text_x = (608 - (bbox[2] - bbox[0])) // 2
-            text_y = int((1080 - (bbox[3] - bbox[1])) * int(positions[i]) / 10)
+            text_width = bbox[2] - bbox[0]
+            text_height = bbox[3] - bbox[1]
+            text_x = (608 - text_width) // 2
+            text_y = int((1080 - text_height) * int(positions[i]) / 10)
+
             if bgColors[i] != 'transparent':
-                draw.rectangle([(text_x - 10, text_y - 10), (text_x + bbox[2] - bbox[0] + 10, text_y + bbox[3] - bbox[1] + 10)], fill=bgColors[i])
+                draw.rectangle([
+                    (text_x - 8, text_y - 4),
+                    (text_x + text_width + 8, text_y + text_height + 4)
+                ], fill=bgColors[i])
+
             draw.text((text_x, text_y), line, fill=fontColors[i], font=font)
 
+            # 제목
             title = titles[i]
             if title:
                 title_font = get_font(int(titleSizes[i]), titleBolds[i] == 'true')
                 tbbox = draw.textbbox((0, 0), title, font=title_font)
-                tx = (608 - (tbbox[2] - tbbox[0])) // 2
-                ty = int((1080 - (tbbox[3] - tbbox[1])) * int(titlePositions[i]) / 10)
+                t_width = tbbox[2] - tbbox[0]
+                t_height = tbbox[3] - tbbox[1]
+                tx = (608 - t_width) // 2
+                ty = int((1080 - t_height) * int(titlePositions[i]) / 10)
+
                 if titleBgColors[i] != 'transparent':
-                    draw.rectangle([(tx - 10, ty - 10), (tx + tbbox[2] - tbbox[0] + 10, ty + tbbox[3] - tbbox[1] + 10)], fill=titleBgColors[i])
+                    draw.rectangle([
+                        (tx - 8, ty - 4),
+                        (tx + t_width + 8, ty + t_height + 4)
+                    ], fill=titleBgColors[i])
+
                 draw.text((tx, ty), title, fill=titleColors[i], font=title_font)
 
             frame_np = np.array(bg)
