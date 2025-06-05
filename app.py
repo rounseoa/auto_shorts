@@ -22,6 +22,26 @@ async def generate_edge_tts(text, voice, path):
     communicate = edge_tts.Communicate(text=text, voice=voice)
     await communicate.save(path)
 
+@app.route("/preview-voice", methods=["POST"])
+def preview_voice():
+    voice_engine = request.json.get("voiceEngine", "gtts")
+    edge_voice = request.json.get("edgeVoice", "ko-KR-SunHiNeural")
+    text = request.json.get("text", "안녕하세요. 테스트입니다.")
+    temp_dir = tempfile.mkdtemp()
+    tts_path = os.path.join(temp_dir, "sample.mp3")
+
+    try:
+        if voice_engine in ["gtts", "google"]:
+            gTTS(text=text, lang='ko').save(tts_path)
+        elif voice_engine == "edge":
+            asyncio.run(generate_edge_tts(text, edge_voice, tts_path))
+        else:
+            return jsonify({"error": "지원하지 않는 TTS 엔진"}), 400
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+    return send_file(tts_path, mimetype="audio/mpeg")
+
 @app.route("/generate", methods=["POST"])
 def generate_video():
     try:
