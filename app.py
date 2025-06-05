@@ -38,6 +38,10 @@ def generate_video():
         author = request.form.get("author", "")
         views = request.form.get("views", "")
 
+        titleSize = int(request.form.get("titleSize", "40"))
+        titleColor = request.form.get("titleColor", "white")
+        titlePosition = int(request.form.get("titlePosition", "1"))
+
         image = request.files["image"]
         voice_engine = request.form.get("voiceEngine", "gtts")
         edge_voice = request.form.get("edgeVoice", "ko-KR-SunHiNeural")
@@ -55,7 +59,8 @@ def generate_video():
             return jsonify({"error": "지원하지 않는 TTS 엔진"}), 400
 
         audio = AudioFileClip(audio_path)
-        duration = audio.duration
+        max_time = max([starts[i] + durations[i] for i in range(len(texts))])
+        duration = max(audio.duration, max_time)
         fps = 24
 
         bg_img = Image.open(image).convert("RGB")
@@ -65,18 +70,17 @@ def generate_video():
         def draw_top_labels(frame_np):
             img = Image.fromarray(frame_np)
             draw = ImageDraw.Draw(img)
-            label_font = get_font(40)
-            color = "white"
-            label_y = 50
+            font = get_font(titleSize)
+            y = int((1080 - font.size) * titlePosition / 10)
             if title:
-                draw.text((30, label_y), f"#{title}", font=label_font, fill=color)
+                draw.text((30, y), f"#{title}", font=font, fill=titleColor)
             if author:
-                draw.text((30, label_y + 60), f"작성자: {author}", font=label_font, fill=color)
+                draw.text((30, y + 60), f"작성자: {author}", font=font, fill=titleColor)
             if views:
-                draw.text((30, label_y + 120), f"조회수: {views}", font=label_font, fill=color)
+                draw.text((30, y + 120), f"조회수: {views}", font=font, fill=titleColor)
             return np.array(img)
 
-        clips = [ImageClip(draw_top_labels(bg_frame)).set_duration(duration).set_position(("center", "center"))]
+        clips = [ImageClip(draw_top_labels(bg_frame)).set_duration(duration)]
 
         for i, line in enumerate(texts):
             if not line.strip():
@@ -94,7 +98,6 @@ def generate_video():
                         .set_position(("center", y_align))
                         .set_start(start)
                         .set_duration(dur))
-
             clips.append(txt_clip)
 
         final = CompositeVideoClip(clips, size=(608, 1080)).set_audio(audio)
