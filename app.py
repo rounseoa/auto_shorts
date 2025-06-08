@@ -57,12 +57,13 @@ def generate_video():
         title = request.form.get("title", "")
         author = request.form.get("author", "")
         views = request.form.get("views", "")
-
         titleSize = int(request.form.get("titleSize", "40"))
         titleColor = request.form.get("titleColor", "white")
         titlePosition = int(request.form.get("titlePosition", "1"))
 
-        image = request.files["image"]
+        bg_image = request.files["background"]
+        images = request.files.getlist("images")
+
         voice_engine = request.form.get("voiceEngine", "gtts")
         edge_voice = request.form.get("edgeVoice", "ko-KR-SunHiNeural")
 
@@ -83,12 +84,11 @@ def generate_video():
         duration = max(audio.duration, max_time)
         fps = 24
 
-        bg_img = Image.open(image).convert("RGB")
-        bg_img = bg_img.resize((608, 1080))
-        bg_frame = np.array(bg_img)
+        bg_img = Image.open(bg_image).convert("RGB").resize((608, 1080))
+        bg_base_np = np.array(bg_img)
 
-        def draw_top_labels(frame_np):
-            img = Image.fromarray(frame_np)
+        def draw_top_labels(img_np):
+            img = Image.fromarray(img_np)
             draw = ImageDraw.Draw(img)
             font = get_font(titleSize)
             y = int((1080 - font.size) * titlePosition / 10)
@@ -100,25 +100,31 @@ def generate_video():
                 draw.text((30, y + 120), f"조회수: {views}", font=font, fill=titleColor)
             return np.array(img)
 
-        clips = [ImageClip(draw_top_labels(bg_frame)).set_duration(duration)]
+        clips = []
+        bg_with_text = draw_top_labels(bg_base_np)
 
         for i, line in enumerate(texts):
-            if not line.strip():
-                continue
-            font_size = int(fontSizes[i])
-            font_color = fontColors[i]
-            bg_color = bgColors[i]
-            start = starts[i]
-            dur = durations[i]
-            y_align = {"상": "top", "중": "center", "하": "bottom"}.get(positions[i], "center")
+            frame = Image.fromarray(bg_with_text.copy())
 
-            txt_clip = (TextClip(txt=line, fontsize=font_size, font=FONT_PATH,
-                                 color=font_color, method='caption',
-                                 size=(560, None), bg_color=bg_color)
-                        .set_position(("center", y_align))
-                        .set_start(start)
-                        .set_duration(dur))
-            clips.append(txt_clip)
+            if i < len(images):
+                over_img = Image.open(images[i]).convert("RGBA")
+                over_img.thumbnail((600, 600))
+                x = (608 - over_img.width) // 2
+                y = (1080 - over_img.height) // 2
+                frame.paste(over_img, (x, y), over_img)
+
+            draw = ImageDraw.Draw(frame)
+            font = get_font(int(fontSizes[i]))
+            bbox = draw.textbbox((0, 0), line, font=font)
+            text_x = (608 - (bbox[2] - bbox[0])) // 2
+            text_y = int((1080 - (bbox[3] - bbox[1])) * int(positions[i]) / 10)
+            if bgColors[i] != 'transparent':
+                draw.rectangle([(text_x - 10, text_y - 10), (text_x + bbox[2] - bbox[0] + 10, text_y + bbox[3] - bbox[1] + 10)], fill=bgColors[i])
+            draw.text((text_x, text_y), line, font=font, fill=fontColors[i])
+
+            np_frame = np.array(frame.convert("RGB"))
+            img_clip = ImageClip(np_frame).set_duration(durations[i]).set_start(starts[i])
+            clips.append(img_clip)
 
         final = CompositeVideoClip(clips, size=(608, 1080)).set_audio(audio)
         final.write_videofile(output_path, fps=fps)
