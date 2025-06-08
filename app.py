@@ -1,3 +1,4 @@
+
 from flask import Flask, request, send_file, jsonify
 from flask_cors import CORS
 from moviepy.editor import CompositeVideoClip, ImageClip, AudioFileClip, TextClip
@@ -102,6 +103,7 @@ def generate_video():
 
         clips = []
         bg_with_text = draw_top_labels(bg_base_np)
+        position_map = {"상": 2, "중": 5, "하": 8}
 
         for i, line in enumerate(texts):
             frame = Image.fromarray(bg_with_text.copy())
@@ -117,9 +119,15 @@ def generate_video():
             font = get_font(int(fontSizes[i]))
             bbox = draw.textbbox((0, 0), line, font=font)
             text_x = (608 - (bbox[2] - bbox[0])) // 2
-            text_y = int((1080 - (bbox[3] - bbox[1])) * int(positions[i]) / 10)
+            pos_ratio = position_map.get(positions[i], 5)
+            text_y = int((1080 - (bbox[3] - bbox[1])) * pos_ratio / 10)
+
             if bgColors[i] != 'transparent':
-                draw.rectangle([(text_x - 10, text_y - 10), (text_x + bbox[2] - bbox[0] + 10, text_y + bbox[3] - bbox[1] + 10)], fill=bgColors[i])
+                draw.rectangle([(text_x - 10, text_y - 10),
+                                (text_x + bbox[2] - bbox[0] + 10,
+                                 text_y + bbox[3] - bbox[1] + 10)],
+                               fill=bgColors[i])
+
             draw.text((text_x, text_y), line, font=font, fill=fontColors[i])
 
             np_frame = np.array(frame.convert("RGB"))
